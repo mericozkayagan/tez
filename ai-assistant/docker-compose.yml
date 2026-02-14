@@ -1,0 +1,53 @@
+services:
+  # ── PostgreSQL ──────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-assistant-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-assistant}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-assistant_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_assistant}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./packages/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-assistant}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Backend (Fastify) ──────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: ai-assistant-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-assistant}:${POSTGRES_PASSWORD:-assistant_secret}@postgres:5432/${POSTGRES_DB:-ai_assistant}
+    ports:
+      - '${BACKEND_PORT:-3001}:3001'
+
+  # ── Frontend (Next.js) ─────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_URL: ${BACKEND_URL:-http://localhost:3001}
+    container_name: ai-assistant-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - '3000:3000'
+
+volumes:
+  pgdata:

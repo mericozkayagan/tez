@@ -1,0 +1,27 @@
+{
+    "name": "@ai-assistant/db",
+    "version": "1.0.0",
+    "private": true,
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "typecheck": "tsc --noEmit",
+        "migrate": "node migrate.js"
+    },
+    "dependencies": {
+        "@ai-assistant/crypto": "*",
+        "@ai-assistant/types": "*",
+        "pg": "^8.12.0"
+    },
+    "devDependencies": {
+        "@types/pg": "^8.11.6",
+        "typescript": "^5.4.5"
+    }
+}
