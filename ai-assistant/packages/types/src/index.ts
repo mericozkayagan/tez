@@ -62,8 +62,10 @@ export type ToolName =
     | 'notion_search'
     | 'notion_create_page'
     | 'notion_append_to_page'
+    | 'notion_get_page'
     | 'gmail_send_email'
-    | 'gmail_list_emails';
+    | 'gmail_list_emails'
+    | 'gmail_read_email';
 
 export interface ToolResult {
     success: boolean;

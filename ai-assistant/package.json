@@ -8,11 +8,12 @@
     ],
     "scripts": {
         "build": "npm run build --workspaces --if-present",
-        "dev:backend": "npm run dev --workspace=apps/backend",
+        "dev:backend": "npm run build:packages && npm run dev --workspace=apps/backend",
         "dev:frontend": "npm run dev --workspace=apps/frontend",
         "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
         "db:migrate": "node packages/db/migrate.js",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "build:packages": "tsc -p packages/crypto/tsconfig.json --skipLibCheck && tsc -p packages/types/tsconfig.json --skipLibCheck && tsc -p packages/db/tsconfig.json --skipLibCheck && tsc -p packages/mcp-tools/tsconfig.json --skipLibCheck"
     },
     "devDependencies": {
         "concurrently": "^8.2.2",

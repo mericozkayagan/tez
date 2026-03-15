@@ -180,6 +180,96 @@ const notionAppendToPageParams = z.object({
     content: z.string().describe('Content to append. Use "---" on its own line as a separator before your content to visually separate it from existing content when appropriate.'),
 });
 
+// ────────────────────────────────────────────────
+// notion_get_page
+// ────────────────────────────────────────────────
+
+const notionGetPageParams = z.object({
+    pageId: z.string().describe('ID of the Notion page to read (from notion_search results)'),
+});
+
+export const notionGetPage: ToolDefinition = {
+    name: 'notion_get_page',
+    description: 'Read the full content of a Notion page. Use this when the user asks to see what is on a specific page, or before updating it to understand existing content.',
+    parameters: notionGetPageParams,
+    async execute(userId: string, params: Record<string, unknown>): Promise<ToolResult> {
+        const parsed = notionGetPageParams.parse(params);
+        const accessToken = await ensureValidToken(userId, 'notion', 'notion_get_page');
+
+        // Fetch page metadata
+        const pageResp = await fetch(`https://api.notion.com/v1/pages/${parsed.pageId}`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Notion-Version': '2022-06-28',
+            },
+        });
+
+        if (!pageResp.ok) {
+            const errText = await pageResp.text();
+            throw new IntegrationAPIError('notion_get_page', 'Notion', pageResp.status, errText);
+        }
+
+        const page = await pageResp.json() as {
+            id: string;
+            url: string;
+            properties?: Record<string, { title?: Array<{ plain_text: string }> }>;
+        };
+
+        let title = 'Untitled';
+        if (page.properties) {
+            for (const prop of Object.values(page.properties)) {
+                if (prop.title && prop.title.length > 0) {
+                    title = prop.title.map(t => t.plain_text).join('');
+                    break;
+                }
+            }
+        }
+
+        // Fetch page blocks (content)
+        const blocksResp = await fetch(`https://api.notion.com/v1/blocks/${parsed.pageId}/children?page_size=50`, {
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Notion-Version': '2022-06-28',
+            },
+        });
+
+        if (!blocksResp.ok) {
+            const errText = await blocksResp.text();
+            throw new IntegrationAPIError('notion_get_page', 'Notion', blocksResp.status, errText);
+        }
+
+        const blocksData = await blocksResp.json() as {
+            results: Array<{
+                type: string;
+                [key: string]: unknown;
+            }>;
+        };
+
+        // Extract text from blocks
+        const textBlocks: string[] = [];
+        for (const block of blocksData.results || []) {
+            const blockContent = block[block.type] as { rich_text?: Array<{ plain_text: string }> } | undefined;
+            if (blockContent?.rich_text) {
+                const text = blockContent.rich_text.map((t) => t.plain_text).join('');
+                if (text.trim()) textBlocks.push(text);
+            } else if (block.type === 'divider') {
+                textBlocks.push('---');
+            }
+        }
+
+        return {
+            success: true,
+            data: {
+                id: page.id,
+                title,
+                url: page.url,
+                content: textBlocks.join('\n\n'),
+                blockCount: blocksData.results?.length || 0,
+            },
+        };
+    },
+};
+
 export const notionAppendToPage: ToolDefinition = {
     name: 'notion_append_to_page',
     description: 'Append content to an existing Notion page. Use this when the user wants to add notes to a specific page instead of creating a new one.',

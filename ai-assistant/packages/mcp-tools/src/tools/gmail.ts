@@ -78,6 +78,98 @@ export const gmailListEmails: ToolDefinition = {
 };
 
 // ────────────────────────────────────────────────
+// gmail_read_email
+// ────────────────────────────────────────────────
+
+const readEmailParams = z.object({
+    messageId: z.string().describe('The Gmail message ID (from gmail_list_emails results)'),
+});
+
+export const gmailReadEmail: ToolDefinition = {
+    name: 'gmail_read_email',
+    description: "Read the full body of a specific Gmail message. Use this when the user wants to read, reply to, or get details of a specific email. Requires the message ID from gmail_list_emails.",
+    parameters: readEmailParams,
+    async execute(userId: string, params: Record<string, unknown>): Promise<ToolResult> {
+        const parsed = readEmailParams.parse(params);
+        const accessToken = await ensureValidToken(userId, 'google', 'gmail_read_email');
+
+        const response = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${parsed.messageId}?format=full`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new IntegrationAPIError('gmail_read_email', 'Gmail', response.status, err);
+        }
+
+        const msg = await response.json() as {
+            id: string;
+            snippet: string;
+            payload: {
+                headers: Array<{ name: string; value: string }>;
+                mimeType: string;
+                body?: { data?: string };
+                parts?: Array<{
+                    mimeType: string;
+                    body: { data?: string };
+                    parts?: Array<{ mimeType: string; body: { data?: string } }>;
+                }>;
+            };
+            labelIds: string[];
+        };
+
+        const headers = msg.payload?.headers || [];
+        const get = (name: string) => headers.find(h => h.name === name)?.value || '';
+
+        // Recursively find plain text body
+        function extractBody(payload: typeof msg.payload): string {
+            if (payload.mimeType === 'text/plain' && payload.body?.data) {
+                return Buffer.from(payload.body.data, 'base64').toString('utf-8');
+            }
+            if (payload.parts) {
+                // Prefer text/plain, fallback to text/html
+                const plain = payload.parts.find(p => p.mimeType === 'text/plain');
+                if (plain?.body?.data) {
+                    return Buffer.from(plain.body.data, 'base64').toString('utf-8');
+                }
+                // Try nested parts (multipart/alternative inside multipart/mixed)
+                for (const part of payload.parts) {
+                    if (part.parts) {
+                        const nestedPlain = part.parts.find(p => p.mimeType === 'text/plain');
+                        if (nestedPlain?.body?.data) {
+                            return Buffer.from(nestedPlain.body.data, 'base64').toString('utf-8');
+                        }
+                    }
+                }
+                const html = payload.parts.find(p => p.mimeType === 'text/html');
+                if (html?.body?.data) {
+                    const rawHtml = Buffer.from(html.body.data, 'base64').toString('utf-8');
+                    // Strip HTML tags for plain text
+                    return rawHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                }
+            }
+            return msg.snippet || '(no body)';
+        }
+
+        const body = extractBody(msg.payload);
+
+        return {
+            success: true,
+            data: {
+                id: msg.id,
+                subject: get('Subject') || '(no subject)',
+                from: get('From'),
+                to: get('To'),
+                date: get('Date'),
+                body,
+                unread: msg.labelIds?.includes('UNREAD') ?? false,
+            },
+        };
+    },
+};
+
+// ────────────────────────────────────────────────
 // gmail_send_email
 // ────────────────────────────────────────────────
 
