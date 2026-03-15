@@ -13,6 +13,8 @@ import {
     Settings,
     LogOut,
     Trash2,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 
 interface Conversation {
@@ -27,6 +29,7 @@ interface ChatSidebarProps {
 }
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+const RECENT_COUNT = 5;
 
 export default function ChatSidebar({
     currentConversationId,
@@ -35,6 +38,7 @@ export default function ChatSidebar({
     const router = useRouter();
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [showAll, setShowAll] = useState(false);
 
     const fetchConversations = async () => {
         try {
@@ -57,7 +61,7 @@ export default function ChatSidebar({
 
     useEffect(() => {
         fetchConversations();
-    }, [currentConversationId]); // Refetch when ID changes (e.g. new chat created)
+    }, [currentConversationId]);
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation();
@@ -69,7 +73,6 @@ export default function ChatSidebar({
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
             });
-            // remove from list
             setConversations((prev) => prev.filter((c) => c.id !== id));
             if (currentConversationId === id) {
                 onSelectConversation(undefined);
@@ -83,6 +86,33 @@ export default function ChatSidebar({
         localStorage.removeItem('token');
         router.push('/login');
     };
+
+    const recent = conversations.slice(0, RECENT_COUNT);
+    const older = conversations.slice(RECENT_COUNT);
+    const hasMore = older.length > 0;
+
+    const ConvItem = ({ conv }: { conv: Conversation }) => (
+        <div
+            key={conv.id}
+            onClick={() => onSelectConversation(conv.id)}
+            className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-colors ${
+                currentConversationId === conv.id
+                    ? 'bg-white/10 text-white'
+                    : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+            }`}
+        >
+            <MessageSquare className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 truncate">{conv.title || 'Untitled Chat'}</span>
+
+            <button
+                onClick={(e) => handleDelete(e, conv.id)}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
+                title="Delete"
+            >
+                <Trash2 className="w-3 h-3" />
+            </button>
+        </div>
+    );
 
     return (
         <aside className="w-64 border-r border-white/5 flex flex-col bg-surface-900 flex-shrink-0">
@@ -118,27 +148,40 @@ export default function ChatSidebar({
                 ) : conversations.length === 0 ? (
                     <div className="px-3 py-2 text-white/30 text-xs">No history yet.</div>
                 ) : (
-                    conversations.map((conv) => (
-                        <div
-                            key={conv.id}
-                            onClick={() => onSelectConversation(conv.id)}
-                            className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm cursor-pointer transition-colors ${currentConversationId === conv.id
-                                    ? 'bg-white/10 text-white'
-                                    : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-                                }`}
-                        >
-                            <MessageSquare className="w-4 h-4 flex-shrink-0" />
-                            <span className="flex-1 truncate">{conv.title || 'Untitled Chat'}</span>
+                    <>
+                        {recent.map((conv) => (
+                            <ConvItem key={conv.id} conv={conv} />
+                        ))}
 
-                            <button
-                                onClick={(e) => handleDelete(e, conv.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-opacity"
-                                title="Delete"
-                            >
-                                <Trash2 className="w-3 h-3" />
-                            </button>
-                        </div>
-                    ))
+                        {hasMore && (
+                            <>
+                                <button
+                                    onClick={() => setShowAll((v) => !v)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors"
+                                >
+                                    {showAll ? (
+                                        <>
+                                            <ChevronUp className="w-3 h-3" />
+                                            Show less
+                                        </>
+                                    ) : (
+                                        <>
+                                            <ChevronDown className="w-3 h-3" />
+                                            {older.length} more conversation{older.length > 1 ? 's' : ''}
+                                        </>
+                                    )}
+                                </button>
+
+                                {showAll && (
+                                    <div className="space-y-1">
+                                        {older.map((conv) => (
+                                            <ConvItem key={conv.id} conv={conv} />
+                                        ))}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </>
                 )}
             </div>
 
