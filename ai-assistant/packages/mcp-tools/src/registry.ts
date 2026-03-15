@@ -3,7 +3,7 @@ import { ToolExecutionError } from './errors';
 import { googleCalendarListEvents, googleCalendarCreateEvent, googleCalendarUpdateEvent } from './tools/google-calendar';
 import { googleDriveListFiles, googleDriveUploadFile } from './tools/google-drive';
 import { notionSearch, notionCreatePage, notionAppendToPage } from './tools/notion';
-import { gmailSendEmail } from './tools/gmail';
+import { gmailSendEmail, gmailListEmails } from './tools/gmail';
 
 /**
  * Registry mapping tool names to their definitions.
@@ -18,6 +18,7 @@ const toolRegistry = new Map<ToolName, ToolDefinition>([
     ['notion_create_page', notionCreatePage],
     ['notion_append_to_page', notionAppendToPage],
     ['gmail_send_email', gmailSendEmail],
+    ['gmail_list_emails', gmailListEmails],
 ]);
 
 /**

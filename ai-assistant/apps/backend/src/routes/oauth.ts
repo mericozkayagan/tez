@@ -11,6 +11,7 @@ const GOOGLE_SCOPES = [
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/drive.readonly',
     'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.readonly',
 ].join(' ');
 
 export async function oauthRoutes(app: FastifyInstance): Promise<void> {

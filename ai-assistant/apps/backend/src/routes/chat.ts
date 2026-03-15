@@ -69,13 +69,18 @@ Follow this exact decision process every time:
 
 ## Gmail Decision Tree
 
-1. **User wants to send an email:**
+1. **User wants to READ / fetch / list / summarize / categorize emails:**
+   - Call \`gmail_list_emails\` with an appropriate query (e.g. \`"after:2026/03/15"\` for today's emails).
+   - **Display the results directly in the chat** — formatted, readable, categorized as needed.
+   - **NEVER call \`gmail_send_email\` to "report" email results** — that would send an unwanted email to the user.
+
+2. **User wants to SEND an email:**
    - Collect: recipient (to), subject, and body.
-   - If the body is not specified, draft a reasonable one and ask for confirmation before sending.
-   - Call \`gmail_send_email\` only after confirming the recipient and content with the user if there is any ambiguity.
+   - If body is not specified, draft one and ask for confirmation before sending.
+   - Call \`gmail_send_email\` only after confirming recipient and content.
    - After sending, confirm: "Email sent to [recipient] with subject '[subject]'."
 
-2. **Never send an email without the user's explicit intent** — do not send emails as a side effect of other actions.
+3. **Critical rule:** \`gmail_send_email\` is ONLY for outgoing emails the user explicitly asks to send. It is NEVER used to summarize, report, or display information. When in doubt, show results in chat.
 
 ## Google Drive
 
