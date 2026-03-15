@@ -15,7 +15,7 @@ const listEmailsParams = z.object({
 export const gmailListEmails: ToolDefinition = {
     name: 'gmail_list_emails',
     description:
-        "List and read emails from the user's Gmail inbox. Use this to fetch, summarize, or categorize emails. Always display results directly in the chat — never send an email to report them.",
+        "FETCH and READ emails from the user's Gmail inbox. Use this whenever the user asks to see, list, summarize, or categorize their emails. Returns real email data (subject, sender, date, snippet). Display the results in the chat — do NOT use gmail_send_email for this purpose.",
     parameters: listEmailsParams,
     async execute(userId: string, params: Record<string, unknown>): Promise<ToolResult> {
         const parsed = listEmailsParams.parse(params);
@@ -91,7 +91,7 @@ const sendEmailParams = z.object({
 export const gmailSendEmail: ToolDefinition = {
     name: 'gmail_send_email',
     description:
-        "Send an email via the user's Gmail account. Use this when the user wants to email someone — e.g. sharing a summary, notifying about a meeting, or following up.",
+        "SEND an outgoing email via the user's Gmail. ONLY use this when the user explicitly asks to send/write/compose an email TO someone. Do NOT use this to fetch, read, list, summarize, or report emails — use gmail_list_emails for that.",
     parameters: sendEmailParams,
     async execute(userId: string, params: Record<string, unknown>): Promise<ToolResult> {
         const parsed = sendEmailParams.parse(params);
