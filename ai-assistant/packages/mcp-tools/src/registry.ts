@@ -4,6 +4,7 @@ import { googleCalendarListEvents, googleCalendarCreateEvent, googleCalendarUpda
 import { googleDriveListFiles, googleDriveUploadFile } from './tools/google-drive';
 import { notionSearch, notionCreatePage, notionAppendToPage, notionGetPage } from './tools/notion';
 import { gmailSendEmail, gmailListEmails, gmailReadEmail } from './tools/gmail';
+import { tavilySearch } from './tools/tavily';
 
 /**
  * Registry mapping tool names to their definitions.
@@ -21,6 +22,7 @@ const toolRegistry = new Map<ToolName, ToolDefinition>([
     ['gmail_send_email', gmailSendEmail],
     ['gmail_list_emails', gmailListEmails],
     ['gmail_read_email', gmailReadEmail],
+    ['web_search', tavilySearch],
 ]);
 
 /**

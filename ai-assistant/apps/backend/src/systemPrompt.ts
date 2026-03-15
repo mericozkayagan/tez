@@ -88,6 +88,12 @@ export function buildSystemPrompt(): string {
         '- Use `google_drive_list_files` to browse or find files when the user references Drive.',
         '- Use `google_drive_upload_file` to save text content (notes, summaries, code) to Drive when requested.',
         '',
+        '## Web Search',
+        '',
+        '- Use `web_search` whenever the user asks about current events, recent news, latest software versions, real-world facts, or anything outside your training knowledge.',
+        '- After getting results, summarize the key findings in a clear, readable format with source URLs.',
+        '- For complex research tasks, you may call `web_search` multiple times with different queries to gather comprehensive information.',
+        '',
         '## Tool Chaining',
         'When a task requires multiple steps, complete them in sequence and narrate each step.',
     ];

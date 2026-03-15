@@ -19,16 +19,53 @@ export async function oauthRoutes(app: FastifyInstance): Promise<void> {
     // app.addHook('onRequest', authenticate);
 
     /**
-     * GET /oauth/:provider/authorize
-     * Redirect user to OAuth consent screen.
+     * POST /oauth/:provider/initiate
+     * Returns the OAuth redirect URL — frontend POSTs with Bearer token (no JWT in URL).
+     */
+    app.post<{ Params: { provider: string } }>(
+        '/:provider/initiate',
+        { onRequest: authenticate },
+        async (request, reply) => {
+            const { provider } = request.params;
+            const state = app.jwt.sign({ sub: request.userId }, { expiresIn: '5m' });
+
+            if (provider === 'google') {
+                const params = new URLSearchParams({
+                    client_id: process.env.GOOGLE_CLIENT_ID!,
+                    redirect_uri: process.env.GOOGLE_REDIRECT_URI!,
+                    response_type: 'code',
+                    scope: GOOGLE_SCOPES,
+                    access_type: 'offline',
+                    prompt: 'consent',
+                    state,
+                });
+                return reply.send({ redirectUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
+            }
+
+            if (provider === 'notion') {
+                const params = new URLSearchParams({
+                    client_id: process.env.NOTION_CLIENT_ID!,
+                    redirect_uri: process.env.NOTION_REDIRECT_URI!,
+                    response_type: 'code',
+                    owner: 'user',
+                    state,
+                });
+                return reply.send({ redirectUrl: `https://api.notion.com/v1/oauth/authorize?${params}` });
+            }
+
+            return reply.status(400).send({ error: `Unknown OAuth provider: ${provider}` });
+        }
+    );
+
+    /**
+     * GET /oauth/:provider/authorize (legacy — kept for backwards compatibility)
+     * Redirect user to OAuth consent screen via GET + query token.
      */
     app.get<{ Params: { provider: string } }>(
         '/:provider/authorize',
-        { onRequest: authenticate }, // Auth required to start flow
+        { onRequest: authenticate },
         async (request, reply) => {
             const { provider } = request.params;
-
-            // Generate a short-lived state token containing userId to prevent CSRF and identifying the user on callback
             const state = app.jwt.sign({ sub: request.userId }, { expiresIn: '5m' });
 
             if (provider === 'google') {

@@ -134,9 +134,15 @@ export default function SettingsPage() {
         }
     };
 
-    const handleConnect = (provider: string) => {
-        const token = localStorage.getItem('token');
-        window.location.href = `${BACKEND_URL}/oauth/${provider}/authorize?token=${token}`;
+    const handleConnect = async (provider: string) => {
+        try {
+            const data = await apiFetch<{ redirectUrl: string }>(`/oauth/${provider}/initiate`, {
+                method: 'POST',
+            });
+            window.location.href = data.redirectUrl;
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to start OAuth flow');
+        }
     };
 
     const handleDisconnect = async (provider: string) => {

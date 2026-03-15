@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { streamText, tool } from 'ai';
+import { streamText, generateText, tool } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { convertToCoreMessages } from 'ai';
@@ -29,17 +29,15 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
 
         // 0. Handle Conversation ID & Persistence
         let currentConversationId = conversationId;
+        const isNewConversation = !currentConversationId;
+
         if (!currentConversationId) {
-            // New conversation — use first message content as title draft (trim at word boundary)
+            // Temporary title — will be replaced by AI-generated one in onFinish
             const firstMsg = messages.find(m => m.role === 'user')?.content || 'New Chat';
-            const raw = firstMsg.slice(0, 60);
-            const title = raw.length < firstMsg.length
-                ? (raw.lastIndexOf(' ') > 20 ? raw.slice(0, raw.lastIndexOf(' ')) + '...' : raw + '...')
-                : raw;
-            const conv = await chatRepo.createConversation(userId, title);
+            const tempTitle = firstMsg.slice(0, 50);
+            const conv = await chatRepo.createConversation(userId, tempTitle);
             currentConversationId = conv.id;
         } else {
-            // Verify ownership
             const conv = await chatRepo.getConversation(currentConversationId, userId);
             if (!conv) {
                 return reply.status(404).send({ error: 'Conversation not found' });
@@ -98,6 +96,11 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
             });
         }
 
+        // Capture for use in onFinish closure
+        const capturedConversationId = currentConversationId;
+        const capturedModel = model;
+        const userMessage = lastMessage?.content || '';
+
         // 3. Stream Response
         const result = await streamText({
             model,
@@ -105,15 +108,31 @@ export async function chatRoutes(app: FastifyInstance): Promise<void> {
             messages: convertToCoreMessages(messages),
             tools: aiTools,
             maxSteps: 5,
-            abortSignal: AbortSignal.timeout(120_000), // 2-minute timeout
+            abortSignal: AbortSignal.timeout(120_000),
             onFinish: async ({ text, toolCalls, toolResults }) => {
                 await chatRepo.addMessage(
-                    currentConversationId!,
+                    capturedConversationId,
                     'assistant',
                     text || '',
                     toolCalls,
                     toolResults
                 );
+
+                // Generate AI title for new conversations (fire-and-forget)
+                if (isNewConversation && userMessage) {
+                    generateText({
+                        model: capturedModel,
+                        messages: [{
+                            role: 'user',
+                            content: 'Generate a short conversation title (max 5 words, no quotes) for a chat that starts with this message: "' + userMessage.slice(0, 200) + '". Reply with ONLY the title.',
+                        }],
+                        maxTokens: 15,
+                    }).then(({ text: title }) => {
+                        if (title?.trim()) {
+                            chatRepo.updateTitle(capturedConversationId, title.trim()).catch(() => {});
+                        }
+                    }).catch(() => {});
+                }
             }
         });
 

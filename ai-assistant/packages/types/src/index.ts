@@ -65,7 +65,8 @@ export type ToolName =
     | 'notion_get_page'
     | 'gmail_send_email'
     | 'gmail_list_emails'
-    | 'gmail_read_email';
+    | 'gmail_read_email'
+    | 'web_search';
 
 export interface ToolResult {
     success: boolean;
@@ -185,6 +186,7 @@ export const EnvSchema = z.object({
     RATE_LIMIT_MAX: z.coerce.number().default(100),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+    TAVILY_API_KEY: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

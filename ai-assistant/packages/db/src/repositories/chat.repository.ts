@@ -102,6 +102,13 @@ export class ChatRepository {
         }));
     }
 
+    async updateTitle(id: string, title: string): Promise<void> {
+        await this.pool.query(
+            `UPDATE conversations SET title = $1 WHERE id = $2`,
+            [title, id]
+        );
+    }
+
     async deleteConversation(id: string, userId: string): Promise<void> {
         await this.pool.query(
             `DELETE FROM conversations WHERE id = $1 AND user_id = $2`,
