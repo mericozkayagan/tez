@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-assistant_secret}
       POSTGRES_DB: ${POSTGRES_DB:-ai_assistant}
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./packages/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql

@@ -56,11 +56,13 @@ export const OAUTH_PROVIDERS: OAuthProvider[] = ['google', 'notion'];
 export type ToolName =
     | 'google_calendar_list_events'
     | 'google_calendar_create_event'
+    | 'google_calendar_update_event'
     | 'google_drive_list_files'
     | 'google_drive_upload_file'
     | 'notion_search'
     | 'notion_create_page'
-    | 'notion_append_to_page';
+    | 'notion_append_to_page'
+    | 'gmail_send_email';
 
 export interface ToolResult {
     success: boolean;

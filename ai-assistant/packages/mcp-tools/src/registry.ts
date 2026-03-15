@@ -1,8 +1,9 @@
 import type { ToolDefinition, ToolName, ToolResult } from '@ai-assistant/types';
 import { ToolExecutionError } from './errors';
-import { googleCalendarListEvents, googleCalendarCreateEvent } from './tools/google-calendar';
+import { googleCalendarListEvents, googleCalendarCreateEvent, googleCalendarUpdateEvent } from './tools/google-calendar';
 import { googleDriveListFiles, googleDriveUploadFile } from './tools/google-drive';
 import { notionSearch, notionCreatePage, notionAppendToPage } from './tools/notion';
+import { gmailSendEmail } from './tools/gmail';
 
 /**
  * Registry mapping tool names to their definitions.
@@ -10,11 +11,13 @@ import { notionSearch, notionCreatePage, notionAppendToPage } from './tools/noti
 const toolRegistry = new Map<ToolName, ToolDefinition>([
     ['google_calendar_list_events', googleCalendarListEvents],
     ['google_calendar_create_event', googleCalendarCreateEvent],
+    ['google_calendar_update_event', googleCalendarUpdateEvent],
     ['google_drive_list_files', googleDriveListFiles],
     ['google_drive_upload_file', googleDriveUploadFile],
     ['notion_search', notionSearch],
     ['notion_create_page', notionCreatePage],
     ['notion_append_to_page', notionAppendToPage],
+    ['gmail_send_email', gmailSendEmail],
 ]);
 
 /**

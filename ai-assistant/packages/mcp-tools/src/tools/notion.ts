@@ -102,38 +102,34 @@ export const notionSearch: ToolDefinition = {
 const notionCreatePageParams = z.object({
     title: z.string().describe('Title of the new page'),
     content: z.string().describe('Content of the page (text or markdown)'),
-    parentId: z.string().describe('ID of the parent page or database to create this page inside. REQUIRED.'),
+    parentId: z.string().describe('ID of the parent page or database. Get this from notion_search results. REQUIRED.'),
+    parentType: z.enum(['page', 'database']).optional().default('page').describe('Whether the parent is a page or database (default: page)'),
 });
 
 export const notionCreatePage: ToolDefinition = {
     name: 'notion_create_page',
-    description: 'Create a new page in Notion. You MUST provide a parentId (use notion_search to find a valid parent page or database first).',
+    description: 'Create a new page in Notion. Only use this when the user explicitly requests a NEW page OR when notion_search found no relevant existing page. You MUST have a parentId before calling this — get it from notion_search or ask the user which section to put it in.',
     parameters: notionCreatePageParams,
     async execute(userId: string, params: Record<string, unknown>): Promise<ToolResult> {
         const parsed = notionCreatePageParams.parse(params);
         const accessToken = await ensureValidToken(userId, 'notion', 'notion_create_page');
 
-        // Simple text to blocks conversion (paragraph)
-        // In a real app, use a markdown-to-notion library
-        const blocks = [
-            {
-                object: 'block',
-                type: 'paragraph',
-                paragraph: {
-                    rich_text: [
-                        {
-                            type: 'text',
-                            text: {
-                                content: parsed.content || '',
-                            },
-                        },
-                    ],
-                },
+        // Convert content into paragraph blocks, split by double newlines
+        const paragraphs = (parsed.content || '').split(/\n\n+/).filter(p => p.trim());
+        const blocks = (paragraphs.length > 0 ? paragraphs : [parsed.content || '']).map((para) => ({
+            object: 'block',
+            type: 'paragraph',
+            paragraph: {
+                rich_text: [{ type: 'text', text: { content: para.trim() } }],
             },
-        ];
+        }));
+
+        const parent = parsed.parentType === 'database'
+            ? { database_id: parsed.parentId }
+            : { page_id: parsed.parentId };
 
         const body = {
-            parent: { page_id: parsed.parentId }, // Assuming parent is a page for now. Could be database_id if we checked.
+            parent,
             properties: {
                 title: [
                     {
@@ -145,9 +141,6 @@ export const notionCreatePage: ToolDefinition = {
             },
             children: blocks,
         };
-
-        // Handle if parent is database? API differs slightly (properties must match schema).
-        // For MVP, assume parent is a PAGE. If it fails, we catch error.
 
         const response = await fetch('https://api.notion.com/v1/pages', {
             method: 'POST',
@@ -183,8 +176,8 @@ export const notionCreatePage: ToolDefinition = {
 };
 
 const notionAppendToPageParams = z.object({
-    pageId: z.string().describe('ID of the page to append content to'),
-    content: z.string().describe('Content to append (text or markdown)'),
+    pageId: z.string().describe('ID of the page to append content to. Use the ID from notion_search results or a previously created page in this conversation.'),
+    content: z.string().describe('Content to append. Use "---" on its own line as a separator before your content to visually separate it from existing content when appropriate.'),
 });
 
 export const notionAppendToPage: ToolDefinition = {
@@ -195,23 +188,25 @@ export const notionAppendToPage: ToolDefinition = {
         const parsed = notionAppendToPageParams.parse(params);
         const accessToken = await ensureValidToken(userId, 'notion', 'notion_append_to_page');
 
-        // Simple text to blocks conversion (paragraph)
-        const blocks = [
-            {
+        // Build blocks: if content starts with "---", prepend a divider block
+        const blocks: Array<Record<string, unknown>> = [];
+        let contentText = parsed.content || '';
+        if (contentText.startsWith('---')) {
+            blocks.push({ object: 'block', type: 'divider', divider: {} });
+            contentText = contentText.replace(/^---\s*\n?/, '');
+        }
+
+        // Split into paragraphs by double newline for better structure
+        const paragraphs = contentText.split(/\n\n+/).filter(p => p.trim());
+        for (const para of paragraphs.length > 0 ? paragraphs : [contentText]) {
+            blocks.push({
                 object: 'block',
                 type: 'paragraph',
                 paragraph: {
-                    rich_text: [
-                        {
-                            type: 'text',
-                            text: {
-                                content: parsed.content || '',
-                            },
-                        },
-                    ],
+                    rich_text: [{ type: 'text', text: { content: para.trim() } }],
                 },
-            },
-        ];
+            });
+        }
 
         const response = await fetch(`https://api.notion.com/v1/blocks/${parsed.pageId}/children`, {
             method: 'PATCH',

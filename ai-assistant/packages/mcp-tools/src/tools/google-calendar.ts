@@ -73,6 +73,90 @@ export const googleCalendarListEvents: ToolDefinition = {
 };
 
 // ────────────────────────────────────────────────
+// google_calendar_update_event
+// ────────────────────────────────────────────────
+
+const updateEventParams = z.object({
+    eventId: z.string().describe('ID of the event to update (from google_calendar_list_events)'),
+    summary: z.string().optional().describe('New event title'),
+    description: z.string().optional().describe('New event description'),
+    startDateTime: z.string().optional().describe('New start time (ISO 8601, e.g. 2025-03-15T10:00:00+03:00)'),
+    endDateTime: z.string().optional().describe('New end time (ISO 8601)'),
+    location: z.string().optional().describe('New event location'),
+    attendees: z.array(z.string().email()).optional().describe('New list of attendee emails (replaces existing)'),
+    timeZone: z.string().optional().default('UTC').describe('Time zone (e.g. Europe/Istanbul)'),
+});
+
+export const googleCalendarUpdateEvent: ToolDefinition = {
+    name: 'google_calendar_update_event',
+    description:
+        'Update an existing event on the user\'s Google Calendar. Use google_calendar_list_events first to get the event ID. Only provided fields will be updated.',
+    parameters: updateEventParams,
+    async execute(userId: string, params: Record<string, unknown>): Promise<ToolResult> {
+        const parsed = updateEventParams.parse(params);
+        const accessToken = await ensureValidToken(userId, 'google', 'google_calendar_update_event');
+
+        const body: Record<string, unknown> = {};
+        if (parsed.summary !== undefined) body.summary = parsed.summary;
+        if (parsed.description !== undefined) body.description = parsed.description;
+        if (parsed.location !== undefined) body.location = parsed.location;
+        if (parsed.startDateTime !== undefined) {
+            body.start = { dateTime: parsed.startDateTime, timeZone: parsed.timeZone };
+        }
+        if (parsed.endDateTime !== undefined) {
+            body.end = { dateTime: parsed.endDateTime, timeZone: parsed.timeZone };
+        }
+        if (parsed.attendees !== undefined) {
+            body.attendees = parsed.attendees.map((email) => ({ email }));
+        }
+
+        const response = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${parsed.eventId}`,
+            {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            }
+        );
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new IntegrationAPIError(
+                'google_calendar_update_event',
+                'Google Calendar',
+                response.status,
+                errText
+            );
+        }
+
+        const updated = await response.json() as {
+            id: string;
+            summary: string;
+            htmlLink: string;
+            start: { dateTime?: string; date?: string };
+            end: { dateTime?: string; date?: string };
+            location?: string;
+        };
+
+        return {
+            success: true,
+            data: {
+                id: updated.id,
+                title: updated.summary,
+                link: updated.htmlLink,
+                start: updated.start.dateTime || updated.start.date,
+                end: updated.end.dateTime || updated.end.date,
+                location: updated.location || null,
+                message: 'Event updated successfully',
+            },
+        };
+    },
+};
+
+// ────────────────────────────────────────────────
 // google_calendar_create_event
 // ────────────────────────────────────────────────
 
